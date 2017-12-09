@@ -27,6 +27,7 @@ type Interface interface {
 	CatalogsGetter
 	TemplatesGetter
 	TemplateVersionsGetter
+	DynamicSchemasGetter
 }
 
 type Client struct {
@@ -47,6 +48,7 @@ type Client struct {
 	catalogControllers                    map[string]CatalogController
 	templateControllers                   map[string]TemplateController
 	templateVersionControllers            map[string]TemplateVersionController
+	dynamicSchemaControllers              map[string]DynamicSchemaController
 }
 
 func NewForConfig(config rest.Config) (Interface, error) {
@@ -76,6 +78,7 @@ func NewForConfig(config rest.Config) (Interface, error) {
 		catalogControllers:                    map[string]CatalogController{},
 		templateControllers:                   map[string]TemplateController{},
 		templateVersionControllers:            map[string]TemplateVersionController{},
+		dynamicSchemaControllers:              map[string]DynamicSchemaController{},
 	}, nil
 }
 
@@ -254,6 +257,19 @@ type TemplateVersionsGetter interface {
 func (c *Client) TemplateVersions(namespace string) TemplateVersionInterface {
 	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &TemplateVersionResource, TemplateVersionGroupVersionKind, templateVersionFactory{})
 	return &templateVersionClient{
+		ns:           namespace,
+		client:       c,
+		objectClient: objectClient,
+	}
+}
+
+type DynamicSchemasGetter interface {
+	DynamicSchemas(namespace string) DynamicSchemaInterface
+}
+
+func (c *Client) DynamicSchemas(namespace string) DynamicSchemaInterface {
+	objectClient := clientbase.NewObjectClient(namespace, c.restClient, &DynamicSchemaResource, DynamicSchemaGroupVersionKind, dynamicSchemaFactory{})
+	return &dynamicSchemaClient{
 		ns:           namespace,
 		client:       c,
 		objectClient: objectClient,

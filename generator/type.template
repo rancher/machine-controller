@@ -1,0 +1,7 @@
+package generator
+
+type {{.Name | capitalize}}Config struct {
+    {{ range $key, $value := .schema }}
+    {{$key | capitalize}} {{$value | toLowerCamelCase}} `json:"{{$key | toLowerCamelCase }},omitempty"`
+    {{end}}
+}
