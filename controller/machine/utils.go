@@ -1,30 +1,27 @@
 package machine
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-
 	"time"
 
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
-	"encoding/base64"
-	"io/ioutil"
-
+	"github.com/pkg/errors"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/pkg/errors"
 )
 
 var regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
@@ -176,62 +173,22 @@ func startReturnOutput(command *exec.Cmd) (io.Reader, io.Reader, error) {
 	return readerStdout, readerStderr, nil
 }
 
-func reportStatus(stdoutReader io.Reader, stderrReader io.Reader, machine *v3.Machine, machineClient v3.MachineInterface) error {
+func (m *MachineLifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, machine *v3.Machine) error {
 	scanner := bufio.NewScanner(stdoutReader)
-	lastMsg := ""
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Debugf("stdout: %s", msg)
-		if msg == "" {
-			continue
-		}
-		if msg == lastMsg {
-			continue
-		}
-		transitionMsg, err := filterDockerMessage(msg, machine, false)
+		logrus.Infof("stdout: %s", msg)
+		_, err := filterDockerMessage(msg, machine, false)
 		if err != nil {
 			return err
 		}
-		now := time.Now().Format(time.RFC3339)
-		m, err := machineClient.Get(machine.Name, metav1.GetOptions{})
-		if err != nil {
-			logrus.Warnf("Getting machine failed. Error: %v", err)
+		if err := m.updateMachineCondition(machine, v1.ConditionTrue, ProvisioningState, msg); err != nil {
+			return err
 		}
-		m.Status.Conditions = append(m.Status.Conditions, v3.MachineCondition{
-			LastUpdateTime:     now,
-			LastTransitionTime: now,
-			Type:               ProvisioningState,
-			Status:             v1.ConditionTrue,
-			Reason:             transitionMsg,
-		})
-		if machine, err = machineClient.Update(m); err != nil {
-			logrus.Warnf("Updating machine status failed. Error: %v", err)
-		}
-		lastMsg = msg
 	}
-	lastMsg = ""
 	scanner = bufio.NewScanner(stderrReader)
 	for scanner.Scan() {
 		msg := scanner.Text()
-		logrus.Debugf("stderr: %s", msg)
-		if msg == lastMsg {
-			continue
-		}
-		now := time.Now().Format(time.RFC3339)
-		m, err := machineClient.Get(machine.Name, metav1.GetOptions{})
-		if err != nil {
-			logrus.Warnf("Getting machine failed. Error: %v", err)
-		}
-		m.Status.Conditions = append(m.Status.Conditions, v3.MachineCondition{
-			LastUpdateTime:     now,
-			LastTransitionTime: now,
-			Type:               ErrorState,
-			Status:             v1.ConditionTrue,
-			Reason:             msg,
-		})
-		if machine, err = machineClient.Update(m); err != nil {
-			logrus.Warnf("Updating machine status failed. Error: %v", err)
-		}
 		return errors.New(msg)
 	}
 	return nil
@@ -430,5 +387,22 @@ func getSSHPrivateKey(machineDir string, machine *v3.Machine) (string, error) {
 		return "", nil
 	}
 	return string(data), nil
+}
 
+func waitUntilSSHKey(machineDir string, machine *v3.Machine) error {
+	keyPath := filepath.Join(machineDir, "machines", machine.Name, "id_rsa")
+	startTime := time.Now()
+	increments := 1
+	for {
+		if time.Now().After(startTime.Add(time.Minute * 3)) {
+			return errors.New("Timeout waiting for ssh key")
+		}
+		if _, err := os.Stat(keyPath); err != nil {
+			logrus.Debugf("keyPath not found. The machine is probably still provisioning. Sleep %s second", increments)
+			time.Sleep(time.Duration(increments) * time.Second)
+			increments = increments * 2
+			continue
+		}
+		return nil
+	}
 }
