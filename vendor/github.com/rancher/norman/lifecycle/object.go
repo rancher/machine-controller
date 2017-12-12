@@ -114,11 +114,6 @@ func (o *objectLifecycleAdapter) create(metadata metav1.Object, obj runtime.Obje
 		return false, err
 	}
 
-	obj, err = o.objectClient.Get(metadata.GetName(), metav1.GetOptions{})
-	if err != nil {
-		return false, err
-	}
-
 	_, err = o.objectClient.Update(metadata.GetName(), obj)
 	return false, err
 }
