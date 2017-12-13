@@ -183,6 +183,16 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
 		}
 		obj.Status.ExtractedConfig = extractedConf
 		obj.Status.SSHPrivateKey = sshkey
+		sshUser := ""
+		switch obj.Spec.Driver {
+		case "amazonec2":
+			sshUser = obj.Spec.AmazonEC2Config.SSHUser
+		case "digitalocean":
+			sshUser = obj.Spec.DigitalOceanConfig.SSHUser
+		case "azure":
+			sshUser = obj.Spec.AzureConfig.SSHUser
+		}
+		obj.Status.SSHUser = sshUser
 		if obj, err = m.machineClient.Update(obj); err != nil {
 			return err
 		}
