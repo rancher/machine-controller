@@ -1,4 +1,4 @@
-package machine_driver
+package machinedriver
 
 import (
 	"fmt"

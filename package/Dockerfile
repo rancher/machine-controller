@@ -1,3 +1,3 @@
 FROM ubuntu:16.04
-COPY proxy /usr/bin/
+COPY machine-controller /usr/bin/
 CMD ["machine-controller"]

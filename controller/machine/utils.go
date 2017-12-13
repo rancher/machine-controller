@@ -173,7 +173,7 @@ func startReturnOutput(command *exec.Cmd) (io.Reader, io.Reader, error) {
 	return readerStdout, readerStderr, nil
 }
 
-func (m *MachineLifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, machine *v3.Machine) error {
+func (m *Lifecycle) reportStatus(stdoutReader io.Reader, stderrReader io.Reader, machine *v3.Machine) error {
 	scanner := bufio.NewScanner(stdoutReader)
 	for scanner.Scan() {
 		msg := scanner.Text()

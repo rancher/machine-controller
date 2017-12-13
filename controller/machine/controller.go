@@ -15,7 +15,7 @@ import (
 )
 
 func Register(management *config.ManagementContext) {
-	machineLifecycle := &MachineLifecycle{}
+	machineLifecycle := &Lifecycle{}
 	machineClient := management.Management.Machines("")
 	machineLifecycle.machineClient = machineClient
 	machineLifecycle.machineTemplateClient = management.Management.MachineTemplates("")
@@ -25,23 +25,23 @@ func Register(management *config.ManagementContext) {
 		AddHandler(v3.NewMachineLifecycleAdapter("machine-controller", machineClient, machineLifecycle))
 }
 
-type MachineLifecycle struct {
+type Lifecycle struct {
 	machineClient         v3.MachineInterface
 	machineTemplateClient v3.MachineTemplateInterface
 }
 
-func (m *MachineLifecycle) Create(obj *v3.Machine) error {
+func (m *Lifecycle) Create(obj *v3.Machine) error {
 	// No need to create a deepcopy of obj, obj is already a deepcopy
 	return m.createOrUpdate(obj)
 }
 
-func (m *MachineLifecycle) Updated(obj *v3.Machine) error {
+func (m *Lifecycle) Updated(obj *v3.Machine) error {
 	// YOU MUST CALL DEEPCOPY
 	objCopy := obj.DeepCopy()
 	return m.createOrUpdate(objCopy)
 }
 
-func (m *MachineLifecycle) Remove(obj *v3.Machine) error {
+func (m *Lifecycle) Remove(obj *v3.Machine) error {
 	// No need to create a deepcopy of obj, obj is already a deepcopy
 	if obj.Spec.Driver == "" {
 		return nil
@@ -72,7 +72,7 @@ func (m *MachineLifecycle) Remove(obj *v3.Machine) error {
 	return nil
 }
 
-func (m *MachineLifecycle) createOrUpdate(obj *v3.Machine) error {
+func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
 	if obj.Spec.Driver == "" {
 		return nil
 	}
@@ -195,7 +195,7 @@ func (m *MachineLifecycle) createOrUpdate(obj *v3.Machine) error {
 	return nil
 }
 
-func (m *MachineLifecycle) updateMachineCondition(obj *v3.Machine, status v1.ConditionStatus, state, reason string) error {
+func (m *Lifecycle) updateMachineCondition(obj *v3.Machine, status v1.ConditionStatus, state, reason string) error {
 	var err error
 	obj, err = m.machineClient.Get(obj.Name, metav1.GetOptions{})
 	if err != nil {

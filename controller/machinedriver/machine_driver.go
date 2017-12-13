@@ -1,4 +1,4 @@
-package machine_driver
+package machinedriver
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ const (
 )
 
 func Register(management *config.ManagementContext) {
-	machineDriverLifecycle := &MachineDriverLifecycle{}
+	machineDriverLifecycle := &Lifecycle{}
 	machineDriverClient := management.Management.MachineDrivers("")
 	dynamicSchemaClient := management.Management.DynamicSchemas("")
 	machineDriverLifecycle.machineDriverClient = machineDriverClient
@@ -26,12 +26,12 @@ func Register(management *config.ManagementContext) {
 		AddHandler(v3.NewMachineDriverLifecycleAdapter("machine-driver-controller", machineDriverClient, machineDriverLifecycle))
 }
 
-type MachineDriverLifecycle struct {
+type Lifecycle struct {
 	machineDriverClient v3.MachineDriverInterface
 	schemaClient        v3.DynamicSchemaInterface
 }
 
-func (m *MachineDriverLifecycle) Create(obj *v3.MachineDriver) error {
+func (m *Lifecycle) Create(obj *v3.MachineDriver) error {
 	// if machine driver was created, we also activate the driver by default
 	driver := NewDriver(obj.Spec.Builtin, obj.Name, obj.Spec.URL, obj.Spec.Checksum)
 	if err := driver.Stage(); err != nil {
@@ -76,12 +76,12 @@ func (m *MachineDriverLifecycle) Create(obj *v3.MachineDriver) error {
 	return err
 }
 
-func (m *MachineDriverLifecycle) Updated(obj *v3.MachineDriver) error {
+func (m *Lifecycle) Updated(obj *v3.MachineDriver) error {
 	// YOU MUST CALL DEEPCOPY
 	return nil
 }
 
-func (m *MachineDriverLifecycle) Remove(obj *v3.MachineDriver) error {
+func (m *Lifecycle) Remove(obj *v3.MachineDriver) error {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Name),
 	})

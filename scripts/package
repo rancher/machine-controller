@@ -16,9 +16,9 @@ if echo $TAG | grep -q dirty; then
     TAG=dev
 fi
 
-cp ../bin/proxy .
+cp ../bin/machine-controller .
 
-IMAGE=${REPO}/proxy:${TAG}
+IMAGE=${REPO}/machine-controller:${TAG}
 docker build -t ${IMAGE} .
 echo ${IMAGE} > ../dist/images
 echo Built ${IMAGE}
