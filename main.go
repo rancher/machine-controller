@@ -1,20 +1,13 @@
-//go:generate go run generator/main.go
-
 package main
 
 import (
 	"os"
 
+	"github.com/rancher/machine-controller/controller"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"k8s.io/client-go/tools/clientcmd"
-	"github.com/rancher/machine-controller/controller/machine"
-	machineDriver "github.com/rancher/machine-controller/controller/machine_driver"
-)
-
-var (
-	GITCOMMIT = "HEAD"
 )
 
 func main() {
@@ -26,7 +19,7 @@ func main() {
 			EnvVar: "KUBECONFIG",
 		},
 		cli.BoolFlag{
-			Name: "debug",
+			Name:  "debug",
 			Usage: "Enable debug log",
 		},
 	}
@@ -56,8 +49,7 @@ func run(kubeConfigFile string) error {
 		return err
 	}
 
-	machine.Register(management)
-	machineDriver.Register(management)
+	controller.Register(management)
 
 	return management.StartAndWait()
 }

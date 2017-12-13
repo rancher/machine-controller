@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"net/rpc"
 	"reflect"
+	"strings"
 
 	"github.com/docker/machine/libmachine/drivers/plugin/localbinary"
 	rpcdriver "github.com/docker/machine/libmachine/drivers/rpc"
 	cli "github.com/docker/machine/libmachine/mcnflag"
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-	"strings"
 )
 
 func flagToField(flag cli.Flag) (string, v3.Field, error) {
 	field := v3.Field{
-		Create:  true,
-		Type:    "string",
+		Create: true,
+		Type:   "string",
 	}
 
 	name, err := toLowerCamelCase(flag.String())
