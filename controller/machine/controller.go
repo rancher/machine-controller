@@ -179,7 +179,7 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) (*v3.Machine, error) {
 		command := buildCommand(machineDir, []string{"ip", obj.Name})
 		output, err := command.Output()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		ip := string(bytes.TrimSpace(output))
 		obj, err = m.machineClient.Get(obj.Name, metav1.GetOptions{})
