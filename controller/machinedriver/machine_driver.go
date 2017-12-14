@@ -7,7 +7,13 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sync"
+)
+
+var (
+	schemaLock = sync.Mutex{}
 )
 
 const (
@@ -73,11 +79,20 @@ func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	dynamicSchema.Labels = map[string]string{}
 	dynamicSchema.Labels[driverNameLabel] = obj.Name
 	_, err = m.schemaClient.Create(dynamicSchema)
-	return obj, err
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return nil, err
+	}
+	if err := m.createOrUpdateMachineForEmbeddedType(dynamicSchema.Name, obj.Spec.Active); err != nil {
+		return nil, err
+	}
+	return obj, nil
 }
 
 func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	// YOU MUST CALL DEEPCOPY
+	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name + "config", obj.Spec.Active); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 
@@ -95,5 +110,59 @@ func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		}
 		logrus.Infof("Deleting schema %s done", schema.Name)
 	}
+	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name + "config", false); err != nil {
+		return nil, err
+	}
 	return obj, nil
+}
+
+func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embbedType string, embedded bool) error {
+	schemaLock.Lock()
+	defer schemaLock.Unlock()
+	machineSchema, err := m.schemaClient.Get("machineconfig", metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	} else if errors.IsNotFound(err) {
+		resourceField := map[string]v3.Field{}
+		if embedded {
+			resourceField[embbedType] = v3.Field{
+				Create:   true,
+				Nullable: true,
+				Update:   true,
+				Type:     embbedType,
+			}
+		}
+		dynamicSchema := &v3.DynamicSchema{}
+		dynamicSchema.Name = "machineconfig"
+		dynamicSchema.Spec.ResourceFields = resourceField
+		// todo: add embedded and embeddedType
+		_, err := m.schemaClient.Create(dynamicSchema)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	if embedded {
+		// if embedded we add the type to schema
+		logrus.Infof("uploading %s to machine schema", embbedType)
+		if machineSchema.Spec.ResourceFields == nil {
+			machineSchema.Spec.ResourceFields = map[string]v3.Field{}
+		}
+		machineSchema.Spec.ResourceFields[embbedType] = v3.Field{
+			Create:   true,
+			Nullable: true,
+			Update:   true,
+			Type:     embbedType,
+		}
+	} else {
+		// if not we delete it from schema
+		logrus.Infof("deleting %s from machine schema", embbedType)
+		delete(machineSchema.Spec.ResourceFields, embbedType)
+	}
+
+	_, err = m.schemaClient.Update(machineSchema)
+	if err != nil {
+		return err
+	}
+	return nil
 }

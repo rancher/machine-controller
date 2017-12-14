@@ -5,3 +5,4 @@ metadata:
 spec:
   url: local://,
   builtin: true
+  active: true
