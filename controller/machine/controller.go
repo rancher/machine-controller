@@ -1,11 +1,10 @@
 package machine
 
 import (
-	"time"
-
+	"bytes"
 	"os"
-
 	"strings"
+	"time"
 
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
@@ -177,10 +176,17 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) error {
 		if err != nil {
 			return err
 		}
+		command := buildCommand(machineDir, []string{"ip", obj.Name})
+		output, err := command.Output()
+		if err != nil {
+			return err
+		}
+		ip := string(bytes.TrimSpace(output))
 		obj, err = m.machineClient.Get(obj.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
+		obj.Status.Address = ip
 		obj.Status.ExtractedConfig = extractedConf
 		obj.Status.SSHPrivateKey = sshkey
 		sshUser := ""
