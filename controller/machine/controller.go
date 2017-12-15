@@ -199,6 +199,13 @@ func (m *Lifecycle) createOrUpdate(obj *v3.Machine) (*v3.Machine, error) {
 			sshUser = obj.Spec.AzureConfig.SSHUser
 		}
 		obj.Status.SSHUser = sshUser
+		nodeConfig := &v3.RKEConfigNode{
+			MachineName: obj.Name,
+			Address: obj.Status.Address,
+			SSHKey: obj.Status.SSHPrivateKey,
+			User: obj.Status.SSHUser,
+		}
+		obj.Status.NodeConfig = nodeConfig
 		if obj, err = m.machineClient.Update(obj); err != nil {
 			return nil, err
 		}
