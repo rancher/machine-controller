@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	"sync"
+
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sync"
 )
 
 var (
@@ -82,7 +83,7 @@ func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-	if err := m.createOrUpdateMachineForEmbeddedType(dynamicSchema.Name, obj.Spec.Active); err != nil {
+	if err := m.createOrUpdateMachineForEmbeddedType(dynamicSchema.Name, obj.Name+"Config", obj.Spec.Active); err != nil {
 		return nil, err
 	}
 	return obj, nil
@@ -90,7 +91,7 @@ func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 
 func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	// YOU MUST CALL DEEPCOPY
-	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name + "config", obj.Spec.Active); err != nil {
+	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name+"config", obj.Name+"Config", obj.Spec.Active); err != nil {
 		return nil, err
 	}
 	return nil, nil
@@ -110,32 +111,42 @@ func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 		}
 		logrus.Infof("Deleting schema %s done", schema.Name)
 	}
-	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name + "config", false); err != nil {
+	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name+"config", obj.Name+"Config", false); err != nil {
 		return nil, err
 	}
 	return obj, nil
 }
 
-func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embbedType string, embedded bool) error {
+func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
 	schemaLock.Lock()
 	defer schemaLock.Unlock()
-	machineSchema, err := m.schemaClient.Get("machineconfig", metav1.GetOptions{})
+
+	if err := m.createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, "machineconfig", "machine", embedded); err != nil {
+		return err
+	}
+
+	return m.createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, "machinetemplateconfig", "machineTemplate", embedded)
+}
+
+func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
+	machineSchema, err := m.schemaClient.Get(schemaID, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
 		resourceField := map[string]v3.Field{}
 		if embedded {
-			resourceField[embbedType] = v3.Field{
+			resourceField[fieldName] = v3.Field{
 				Create:   true,
 				Nullable: true,
 				Update:   true,
-				Type:     embbedType,
+				Type:     embeddedType,
 			}
 		}
 		dynamicSchema := &v3.DynamicSchema{}
-		dynamicSchema.Name = "machineconfig"
+		dynamicSchema.Name = schemaID
 		dynamicSchema.Spec.ResourceFields = resourceField
-		// todo: add embedded and embeddedType
+		dynamicSchema.Spec.Embed = true
+		dynamicSchema.Spec.EmbedType = parentID
 		_, err := m.schemaClient.Create(dynamicSchema)
 		if err != nil {
 			return err
@@ -144,20 +155,20 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embbedType string, embe
 	}
 	if embedded {
 		// if embedded we add the type to schema
-		logrus.Infof("uploading %s to machine schema", embbedType)
+		logrus.Infof("uploading %s to machine schema", fieldName)
 		if machineSchema.Spec.ResourceFields == nil {
 			machineSchema.Spec.ResourceFields = map[string]v3.Field{}
 		}
-		machineSchema.Spec.ResourceFields[embbedType] = v3.Field{
+		machineSchema.Spec.ResourceFields[fieldName] = v3.Field{
 			Create:   true,
 			Nullable: true,
 			Update:   true,
-			Type:     embbedType,
+			Type:     embeddedType,
 		}
 	} else {
 		// if not we delete it from schema
-		logrus.Infof("deleting %s from machine schema", embbedType)
-		delete(machineSchema.Spec.ResourceFields, embbedType)
+		logrus.Infof("deleting %s from machine schema", fieldName)
+		delete(machineSchema.Spec.ResourceFields, fieldName)
 	}
 
 	_, err = m.schemaClient.Update(machineSchema)
