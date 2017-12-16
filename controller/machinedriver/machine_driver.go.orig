@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"sync"
-
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/rancher/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sync"
 )
 
 var (
@@ -117,10 +116,13 @@ func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
+<<<<<<< Updated upstream
+func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embbedType string, embedded bool) error {
 	schemaLock.Lock()
 	defer schemaLock.Unlock()
-
+	machineSchema, err := m.schemaClient.Get("machineconfig", metav1.GetOptions{})
+=======
+func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
 	if err := m.createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, "machineconfig", "machine", embedded); err != nil {
 		return err
 	}
@@ -130,6 +132,7 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName
 
 func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
 	machineSchema, err := m.schemaClient.Get(schemaID, metav1.GetOptions{})
+>>>>>>> Stashed changes
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	} else if errors.IsNotFound(err) {
