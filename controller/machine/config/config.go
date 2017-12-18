@@ -90,6 +90,7 @@ func (m *MachineConfig) loadConfig() error {
 		if err != nil {
 			return err
 		}
+		cm.Data = map[string]string{}
 	}
 
 	m.cm = cm
