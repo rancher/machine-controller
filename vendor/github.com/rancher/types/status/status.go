@@ -42,10 +42,15 @@ var conditionMappings = []conditionMapping{
 	{Name: "KernelHasNoDeadlock", Error: true, FalseIsGood: true},
 	{Name: "Unschedulable", Error: true, FalseIsGood: true},
 	{Name: "ReplicaFailure", Error: true, FalseIsGood: true},
-	{Name: "Ready", Transition: false, State: "unavailable"},
+	{Name: "Ready", Transition: false, State: "activating"},
+	{Name: "BackingNamespaceCreated", Transition: true, State: "activating"},
 }
 
 func Set(data map[string]interface{}) {
+	if data == nil {
+		return
+	}
+
 	val, ok := values.GetValue(data, "metadata", "removed")
 	if ok && val != "" && val != nil {
 		data["state"] = "removing"
@@ -70,6 +75,7 @@ func Set(data map[string]interface{}) {
 			if i, err := convert.ToTimestamp(val); err == nil {
 				if time.Unix(i/1000, 0).Add(5 * time.Second).Before(time.Now()) {
 					data["state"] = "active"
+					data["transitioning"] = "no"
 					return
 				}
 			}
@@ -116,6 +122,11 @@ func Set(data map[string]interface{}) {
 
 		if !good && conditionMapping.Transition {
 			transitioning = true
+			if len(message) > 0 {
+				message = strings.Join([]string{message, condition.Message}, ",")
+			} else {
+				message = condition.Message
+			}
 		}
 
 		if !good && state == "" && conditionMapping.State != "" {
