@@ -13,7 +13,8 @@ const (
 	NamespacedCertificateFieldCerts                   = "certs"
 	NamespacedCertificateFieldCreated                 = "created"
 	NamespacedCertificateFieldCreatorID               = "creatorId"
-	NamespacedCertificateFieldFinalizers              = "finalizers"
+	NamespacedCertificateFieldDescription             = "description"
+	NamespacedCertificateFieldExpiresAt               = "expiresAt"
 	NamespacedCertificateFieldIssuedAt                = "issuedAt"
 	NamespacedCertificateFieldIssuer                  = "issuer"
 	NamespacedCertificateFieldKey                     = "key"
@@ -39,7 +40,8 @@ type NamespacedCertificate struct {
 	Certs                   string            `json:"certs,omitempty"`
 	Created                 string            `json:"created,omitempty"`
 	CreatorID               string            `json:"creatorId,omitempty"`
-	Finalizers              []string          `json:"finalizers,omitempty"`
+	Description             string            `json:"description,omitempty"`
+	ExpiresAt               string            `json:"expiresAt,omitempty"`
 	IssuedAt                string            `json:"issuedAt,omitempty"`
 	Issuer                  string            `json:"issuer,omitempty"`
 	Key                     string            `json:"key,omitempty"`
@@ -51,7 +53,7 @@ type NamespacedCertificate struct {
 	ProjectID               string            `json:"projectId,omitempty"`
 	Removed                 string            `json:"removed,omitempty"`
 	SerialNumber            string            `json:"serialNumber,omitempty"`
-	SubjectAlternativeNames string            `json:"subjectAlternativeNames,omitempty"`
+	SubjectAlternativeNames []string          `json:"subjectAlternativeNames,omitempty"`
 	Uuid                    string            `json:"uuid,omitempty"`
 	Version                 string            `json:"version,omitempty"`
 }
