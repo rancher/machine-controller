@@ -22,23 +22,19 @@ const (
 )
 
 func Register(management *config.ManagementContext) {
-	machineDriverLifecycle := &Lifecycle{}
-	machineDriverClient := management.Management.MachineDrivers("")
-	dynamicSchemaClient := management.Management.DynamicSchemas("")
-	machineDriverLifecycle.machineDriverClient = machineDriverClient
-	machineDriverLifecycle.schemaClient = dynamicSchemaClient
-
-	machineDriverClient.
-		Controller().
-		AddHandler(v3.NewMachineDriverLifecycleAdapter("machine-driver-controller", machineDriverClient, machineDriverLifecycle))
+	machineDriverLifecycle := &lifecycle{
+		machineDriverClient: management.Management.MachineDrivers(""),
+		schemaClient:        management.Management.DynamicSchemas(""),
+	}
+	management.Management.MachineDrivers("").AddLifecycle("machine-driver-controller", machineDriverLifecycle)
 }
 
-type Lifecycle struct {
+type lifecycle struct {
 	machineDriverClient v3.MachineDriverInterface
 	schemaClient        v3.DynamicSchemaInterface
 }
 
-func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+func (m *lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	// if machine driver was created, we also activate the driver by default
 	driver := NewDriver(obj.Spec.Builtin, obj.Name, obj.Spec.URL, obj.Spec.Checksum)
 	if err := driver.Stage(); err != nil {
@@ -89,7 +85,7 @@ func (m *Lifecycle) Create(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+func (m *lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	// YOU MUST CALL DEEPCOPY
 	if err := m.createOrUpdateMachineForEmbeddedType(obj.Name+"config", obj.Name+"Config", obj.Spec.Active); err != nil {
 		return nil, err
@@ -97,7 +93,7 @@ func (m *Lifecycle) Updated(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	return nil, nil
 }
 
-func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
+func (m *lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	schemas, err := m.schemaClient.List(metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", driverNameLabel, obj.Name),
 	})
@@ -117,7 +113,7 @@ func (m *Lifecycle) Remove(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	return obj, nil
 }
 
-func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
+func (m *lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName string, embedded bool) error {
 	schemaLock.Lock()
 	defer schemaLock.Unlock()
 
@@ -128,7 +124,7 @@ func (m *Lifecycle) createOrUpdateMachineForEmbeddedType(embeddedType, fieldName
 	return m.createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, "machinetemplateconfig", "machineTemplate", embedded)
 }
 
-func (m *Lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
+func (m *lifecycle) createOrUpdateMachineForEmbeddedTypeWithParents(embeddedType, fieldName, schemaID, parentID string, embedded bool) error {
 	machineSchema, err := m.schemaClient.Get(schemaID, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
