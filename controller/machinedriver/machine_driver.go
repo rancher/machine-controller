@@ -47,8 +47,10 @@ func (m *Lifecycle) download(obj *v3.MachineDriver) (*v3.MachineDriver, error) {
 	var err error
 	// if machine driver was created, we also activate the driver by default
 	driver := NewDriver(obj.Spec.Builtin, obj.Spec.DisplayName, obj.Spec.URL, obj.Spec.Checksum)
+	schemaName := obj.Name + "config"
+	_, err = m.schemaLister.Get("", schemaName)
 
-	if driver.Exists() {
+	if driver.Exists() && err == nil {
 		return obj, nil
 	}
 
