@@ -261,11 +261,16 @@ func (m *Lifecycle) saveConfig(config *machineconfig.MachineConfig, machineDir s
 	obj.Status.NodeConfig = &v3.RKEConfigNode{
 		MachineName:      obj.Spec.ClusterName + ":" + obj.Name,
 		Address:          ip,
-		InternalAddress:  interalAddress,
 		User:             obj.Status.SSHUser,
 		Role:             obj.Spec.Role,
 		HostnameOverride: obj.Spec.RequestedHostname,
 		SSHKey:           sshKey,
+	}
+
+	// we only set internal ip address if useInternalIpAddress is set
+	// in case we have different machines from different cloud providers
+	if obj.Spec.UseInternalIPAddress {
+		obj.Status.NodeConfig.InternalAddress = interalAddress
 	}
 
 	if len(obj.Status.NodeConfig.Role) == 0 {
