@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/types/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 var regExHyphen = regexp.MustCompile("([a-z])([A-Z])")
@@ -251,4 +252,53 @@ func waitUntilSSHKey(machineDir string, machine *v3.Machine) error {
 		}
 		return nil
 	}
+}
+
+func checkSingleNode(machine *v3.Machine, clusters v3.ClusterInterface, machineInterface v3.MachineInterface) (bool, error) {
+	var (
+		etcd, controlplane bool
+	)
+	clusterName := machine.Spec.ClusterName
+	if len(clusterName) == 0 {
+		return false, nil
+	}
+	namespace := machine.Namespace
+	if len(namespace) == 0 {
+		return false, nil
+	}
+	clusterObj, err := clusters.Get(clusterName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	if clusterObj.Spec.RancherKubernetesEngineConfig == nil {
+		return false, nil
+	}
+	if len(machine.Spec.Role) == 1 && machine.Spec.Role[0] == "worker" {
+		return false, nil
+	}
+	machines, err := machineInterface.Controller().Lister().List(namespace, labels.Everything())
+	if err != nil {
+		return false, err
+	}
+	for _, m := range machines {
+		if m.DeletionTimestamp != nil {
+			continue
+		}
+		if m.Name == machine.Name {
+			continue
+		}
+		joinedRoles := strings.Join(m.Spec.Role, ",")
+		if strings.Contains(joinedRoles, "controlplane") {
+			controlplane = true
+		}
+		if strings.Contains(joinedRoles, "etcd") {
+			etcd = true
+		}
+	}
+	if !etcd || !controlplane {
+		logrus.Infof("Can't delete the only etcd or controlplane")
+		return true, nil
+	}
+
+	return false, nil
 }

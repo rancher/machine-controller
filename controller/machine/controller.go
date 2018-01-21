@@ -41,6 +41,7 @@ func Register(management *config.ManagementContext) {
 		machineTemplateGenericClient: management.Management.MachineTemplates("").ObjectClient().UnstructuredClient(),
 		configMapGetter:              management.K8sClient.CoreV1(),
 		logger:                       management.EventLogger,
+		clusters:                     management.Management.Clusters(""),
 	}
 
 	machineClient.AddLifecycle("machine-controller", machineLifecycle)
@@ -53,6 +54,7 @@ type Lifecycle struct {
 	machineTemplateClient        v3.MachineTemplateInterface
 	configMapGetter              typedv1.ConfigMapsGetter
 	logger                       event.Logger
+	clusters                     v3.ClusterInterface
 }
 
 func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
@@ -107,6 +109,14 @@ func (m *Lifecycle) Create(obj *v3.Machine) (*v3.Machine, error) {
 
 func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 	if obj.Status.MachineTemplateSpec == nil {
+		return obj, nil
+	}
+	singleEtcdOrControl, err := checkSingleNode(obj, m.clusters, m.machineClient)
+	if err != nil {
+		return obj, err
+	}
+
+	if singleEtcdOrControl {
 		return obj, nil
 	}
 
