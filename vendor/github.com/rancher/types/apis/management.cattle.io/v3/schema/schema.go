@@ -27,7 +27,9 @@ var (
 		Init(catalogTypes).
 		Init(authnTypes).
 		Init(schemaTypes).
-		Init(stackTypes)
+		Init(stackTypes).
+		Init(userTypes).
+		Init(globalTypes)
 )
 
 func schemaTypes(schemas *types.Schemas) *types.Schemas {
@@ -53,7 +55,9 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			m.DisplayName{},
 		).
 		AddMapperForType(&Version, v3.ClusterStatus{},
+			m.Drop{Field: "serviceAccountToken"},
 			m.Drop{Field: "appliedSpec"},
+			m.Drop{Field: "clusterName"},
 		).
 		AddMapperForType(&Version, v3.ClusterEvent{}, &m.Move{
 			From: "type",
@@ -158,6 +162,7 @@ func machineTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.MachineSpec{}, &m.Embed{Field: "nodeSpec"}).
 		AddMapperForType(&Version, v3.MachineStatus{},
+			&m.Drop{Field: "token"},
 			&m.Drop{Field: "rkeNode"},
 			&m.Drop{Field: "machineTemplateSpec"},
 			&m.Drop{Field: "machineDriverConfig"},
@@ -193,6 +198,7 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.LocalCredential{}).
 		MustImport(&Version, v3.GithubCredential{}).
 		MustImport(&Version, v3.ChangePasswordInput{}).
+		MustImport(&Version, v3.SetPasswordInput{}).
 		MustImportAndCustomize(&Version, v3.Token{}, func(schema *types.Schema) {
 			schema.CollectionActions = map[string]types.Action{
 				"login": {
@@ -204,9 +210,14 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImportAndCustomize(&Version, v3.User{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
-				"changepassword": {
-					Input:  "changePasswordInput",
+				"setpassword": {
+					Input:  "setPasswordInput",
 					Output: "user",
+				},
+			}
+			schema.CollectionActions = map[string]types.Action{
+				"changepassword": {
+					Input: "changePasswordInput",
 				},
 			}
 		})
@@ -223,5 +234,35 @@ func stackTypes(schema *types.Schemas) *types.Schemas {
 					Input: "revision",
 				},
 			}
+		})
+}
+
+func userTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		MustImportAndCustomize(&Version, v3.Preference{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(f types.Field) types.Field {
+				f.Required = true
+				return f
+			})
+			schema.MustCustomizeField("namespaceId", func(f types.Field) types.Field {
+				f.Required = false
+				return f
+			})
+		})
+}
+
+func globalTypes(schema *types.Schemas) *types.Schemas {
+	return schema.
+		AddMapperForType(&Version, v3.ListenConfig{},
+			m.DisplayName{},
+			m.Drop{Field: "caKey"},
+			m.Drop{Field: "caCert"},
+		).
+		MustImport(&Version, v3.ListenConfig{}).
+		MustImportAndCustomize(&Version, v3.Setting{}, func(schema *types.Schema) {
+			schema.MustCustomizeField("name", func(f types.Field) types.Field {
+				f.Required = true
+				return f
+			})
 		})
 }
