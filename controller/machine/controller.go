@@ -127,7 +127,7 @@ func (m *Lifecycle) Remove(obj *v3.Machine) (*v3.Machine, error) {
 	if mExists {
 		m.logger.Infof(obj, "Removing machine %s", obj.Spec.RequestedHostname)
 		if err := deleteMachine(config.Dir(), obj); err != nil {
-			return nil, err
+			return obj, err
 		}
 		m.logger.Infof(obj, "Removing machine %s done", obj.Spec.RequestedHostname)
 	}
